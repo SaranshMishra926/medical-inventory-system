@@ -1,205 +1,246 @@
-# 💊 MediTrack - Medical Inventory Management System
+# Medical Inventory Management System
 
-A modern, responsive web application for comprehensive pharmacy and medical inventory management. Built with React and Tailwind CSS, featuring a beautiful dark/light mode interface and smooth animations.
+A comprehensive medical inventory management system built with React frontend and Node.js/Express backend, featuring Clerk authentication.
 
-![MediTrack Dashboard](https://img.shields.io/badge/React-18.2.0-blue?style=for-the-badge&logo=react)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.3.0-38B2AC?style=for-the-badge&logo=tailwind-css)
-![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+## Features
 
-## 🚀 Features
+- 🔐 **Secure Authentication** - Powered by Clerk with role-based access control
+- 📊 **Real-time Dashboard** - Comprehensive analytics and monitoring
+- 💊 **Inventory Management** - Track medicines, expiry dates, and stock levels
+- 📦 **Order Management** - Complete order lifecycle from creation to delivery
+- 🏢 **Supplier Management** - Manage supplier relationships and performance
+- 📈 **Reports & Analytics** - Detailed reports and insights
+- 🎨 **Modern UI** - Beautiful, responsive interface with dark/light themes
+- 🔒 **Role-based Permissions** - Different access levels for different user types
 
-### 📊 **Dashboard Overview**
-- Real-time inventory statistics and alerts
-- Interactive charts and data visualization
-- Quick action buttons for common tasks
-- Low stock and expiry date notifications
+## Tech Stack
 
-### 📦 **Inventory Management**
-- Complete medicine database with search and filtering
-- Stock level monitoring and threshold alerts
-- Expiry date tracking and notifications
-- Bulk operations and data export
+### Frontend
+- React 18
+- Tailwind CSS
+- Framer Motion
+- Clerk Authentication
+- React Router DOM
+- Lucide React Icons
 
-### 📋 **Order Management**
-- Create and track supplier orders
-- Order status monitoring (Pending, Shipped, Delivered)
-- Supplier relationship management
-- Order history and analytics
+### Backend
+- Node.js
+- Express.js
+- MongoDB with Mongoose
+- Clerk SDK
+- Express Rate Limiting
+- Helmet Security
 
-### 🏢 **Supplier Directory**
-- Comprehensive supplier database
-- Contact information and order history
-- Supplier performance tracking
-- Easy supplier management
+## Prerequisites
 
-### 📈 **Reports & Analytics**
-- Sales and inventory reports
-- Expiry tracking and analysis
-- Supplier performance metrics
-- Exportable data in multiple formats
+- Node.js (v16 or higher)
+- MongoDB (local or cloud)
+- Clerk account for authentication
 
-### ⚙️ **Settings & Preferences**
-- Dark/Light mode toggle with theme persistence
-- Customizable accent colors
-- User profile management
-- System preferences
-
-### 🎨 **Modern UI/UX**
-- Fully responsive design (Desktop, Tablet, Mobile)
-- Smooth animations with Framer Motion
-- Professional dark/light theme system
-- Intuitive navigation and user experience
-
-## 🛠️ Technologies Used
-
-- **Frontend Framework**: React 18.2.0
-- **Styling**: Tailwind CSS 3.3.0
-- **Animations**: Framer Motion
-- **Routing**: React Router v6
-- **Icons**: Lucide React
-- **Charts**: Recharts
-- **State Management**: React Context API
-- **Build Tool**: Create React App
-- **Package Manager**: npm
-
-## 📋 Prerequisites
-
-Before running this project, make sure you have the following installed:
-
-- **Node.js** (version 14.0 or higher)
-- **npm** (version 6.0 or higher)
-
-## 🚀 Getting Started
+## Setup Instructions
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/meditrack-inventory-management.git
-cd meditrack-inventory-management
+git clone <repository-url>
+cd Medical_Inventory_System
 ```
 
-### 2. Install Dependencies
+### 2. Frontend Setup
 
 ```bash
+# Install dependencies
 npm install
+
+# Create environment file
+cp .env.example .env.local
+
+# Update .env.local with your Clerk publishable key
+REACT_APP_CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key_here
+REACT_APP_API_URL=http://localhost:5000/api
 ```
 
-### 3. Start the Development Server
+### 3. Backend Setup
 
 ```bash
+# Navigate to backend directory
+cd backend
+
+# Install dependencies
+npm install
+
+# Create environment file
+cp env.example .env
+
+# Update .env with your configuration
+NODE_ENV=development
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/meditrack
+CLERK_SECRET_KEY=sk_test_your_clerk_secret_key_here
+CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key_here
+FRONTEND_URL=http://localhost:3000
+```
+
+### 4. Clerk Configuration
+
+1. Create a Clerk account at [clerk.com](https://clerk.com)
+2. Create a new application
+3. Get your publishable and secret keys
+4. Update the environment files with your keys
+5. Configure allowed origins in Clerk dashboard:
+   - `http://localhost:3000` (development)
+   - Your production domain
+
+### 5. Database Setup
+
+Make sure MongoDB is running locally or update the connection string in `.env` to point to your MongoDB instance.
+
+### 6. Running the Application
+
+#### Development Mode
+
+```bash
+# Terminal 1 - Start backend
+cd backend
+npm run dev
+
+# Terminal 2 - Start frontend
+cd ../
 npm start
 ```
 
-The application will open in your browser at `http://localhost:3000`
-
-### 4. Build for Production
+#### Production Mode
 
 ```bash
+# Build frontend
 npm run build
+
+# Start backend
+cd backend
+npm start
 ```
 
-This creates a `build` folder with optimized production files.
+## API Endpoints
 
-## 📱 Usage
+### Authentication
+- `GET /api/auth/health` - Health check for authenticated users
 
-### Landing Page
-- Visit the homepage to see the modern landing page
-- Click "Get Started" to navigate to the login page
+### Users
+- `GET /api/users/profile` - Get current user profile
+- `PUT /api/users/profile` - Update user profile
+- `GET /api/users` - Get all users (Admin only)
+- `GET /api/users/:id` - Get user by ID (Admin only)
+- `PUT /api/users/:id` - Update user by ID (Admin only)
+- `DELETE /api/users/:id` - Deactivate user (Admin only)
 
-### Login
-- Use demo credentials: `admin@meditrack.com` / `password123`
-- Or click "Try Demo" for instant access
+### Inventory
+- `GET /api/inventory` - Get all medicines
+- `GET /api/inventory/:id` - Get medicine by ID
+- `POST /api/inventory` - Create new medicine
+- `PUT /api/inventory/:id` - Update medicine
+- `DELETE /api/inventory/:id` - Deactivate medicine
+- `GET /api/inventory/alerts/low-stock` - Get low stock medicines
+- `GET /api/inventory/alerts/expiring` - Get expiring medicines
 
-### Dashboard
-- View real-time inventory statistics
-- Monitor low stock alerts and expiring medicines
-- Access quick actions for common tasks
+### Orders
+- `GET /api/orders` - Get all orders
+- `GET /api/orders/:id` - Get order by ID
+- `POST /api/orders` - Create new order
+- `PUT /api/orders/:id` - Update order
+- `PATCH /api/orders/:id/status` - Update order status
+- `DELETE /api/orders/:id` - Delete order
 
-### Inventory Management
-- Add new medicines with complete details
-- Search and filter medicines by various criteria
-- Monitor stock levels and expiry dates
-- Edit or delete medicine records
+### Suppliers
+- `GET /api/suppliers` - Get all suppliers
+- `GET /api/suppliers/:id` - Get supplier by ID
+- `POST /api/suppliers` - Create new supplier
+- `PUT /api/suppliers/:id` - Update supplier
+- `DELETE /api/suppliers/:id` - Deactivate supplier
 
-### Order Management
-- Create new orders with suppliers
-- Track order status and delivery
-- View order history and analytics
+### Reports
+- `GET /api/reports/dashboard` - Get dashboard overview
+- `GET /api/reports/inventory` - Get inventory analytics
+- `GET /api/reports/orders` - Get order analytics
+- `GET /api/reports/financial` - Get financial reports
+- `GET /api/reports/system` - Get system statistics
 
-### Settings
-- Toggle between dark and light modes
-- Customize accent colors
-- Manage user preferences
-- Change password and profile settings
+## User Roles & Permissions
 
-## 🎨 Theme Customization
+### Administrator
+- Full access to all features
+- User management
+- System settings
+- All reports and analytics
 
-The application supports both dark and light themes with customizable accent colors:
+### Pharmacist
+- Dashboard access
+- Inventory management
+- Order management
+- Reports access
+- No supplier management
+- No settings access
 
-- **Light Mode**: Clean white background with dark text
-- **Dark Mode**: Professional dark background with light text
-- **Accent Colors**: Blue, Green, Purple, Orange options
-- **Persistent Settings**: Theme preferences saved in localStorage
+### Inventory Manager
+- Dashboard access
+- Inventory management
+- Supplier management
+- Reports access
+- No order management
+- No settings access
 
-## 📁 Project Structure
+### Staff
+- Dashboard access
+- Inventory viewing
+- Order management
+- No supplier management
+- No reports access
+- No settings access
 
+### Viewer
+- Dashboard access
+- Read-only access to all data
+- No management capabilities
+
+## Environment Variables
+
+### Frontend (.env.local)
 ```
-src/
-├── components/          # Reusable UI components
-│   ├── Sidebar.js       # Navigation sidebar
-│   ├── TopBar.js        # Top navigation bar
-│   ├── Card.js          # Reusable card component
-│   └── ...
-├── pages/               # Main application pages
-│   ├── LandingPage.js   # Landing page
-│   ├── LoginPage.js     # Login page
-│   ├── Dashboard.js     # Main dashboard
-│   ├── Inventory.js     # Inventory management
-│   ├── Orders.js        # Order management
-│   ├── Suppliers.js     # Supplier directory
-│   ├── Reports.js       # Reports & analytics
-│   └── Settings.js      # Settings page
-├── context/             # React Context providers
-│   └── InventoryContext.js
-├── utils/               # Utility functions
-│   └── index.js
-├── App.js               # Main application component
-└── index.css            # Global styles and CSS variables
+REACT_APP_CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key_here
+REACT_APP_API_URL=http://localhost:5000/api
 ```
 
-## 🔧 Available Scripts
+### Backend (.env)
+```
+NODE_ENV=development
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/meditrack
+CLERK_SECRET_KEY=sk_test_your_clerk_secret_key_here
+CLERK_PUBLISHABLE_KEY=pk_test_your_clerk_publishable_key_here
+FRONTEND_URL=http://localhost:3000
+JWT_SECRET=your_jwt_secret_key_here
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+```
 
-- `npm start` - Runs the app in development mode
-- `npm run build` - Builds the app for production
-- `npm test` - Launches the test runner
-- `npm run eject` - Ejects from Create React App (one-way operation)
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
-## 👨‍💻 Author
+## Support
 
-**Your Name**
-- GitHub: [@yourusername](https://github.com/yourusername)
-- Email: your.email@example.com
+For support, email saranshmishra1529@gmail.com or byallasuresh8@gmail.com
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- React team for the amazing framework
-- Tailwind CSS for the utility-first CSS framework
-- Framer Motion for smooth animations
-- Lucide for beautiful icons
-- All contributors and users of this project
-
----
-
-⭐ **Star this repository if you found it helpful!**"# medical-inventory-system" 
+- Clerk for authentication services
+- MongoDB for database
+- React and Node.js communities
+- All contributors and users

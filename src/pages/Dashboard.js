@@ -18,9 +18,40 @@ import { generateChartData } from '../utils';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { medicines, getDashboardStats } = useInventory();
+  const { medicines, getDashboardStats, loading, error, isApiAvailable } = useInventory();
   const stats = getDashboardStats();
   const { monthlyData, topMedicines } = generateChartData(medicines);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-text-secondary">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-text-primary mb-2">Error Loading Data</h2>
+          <p className="text-text-secondary mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const quickActions = [
     {
@@ -84,19 +115,39 @@ const Dashboard = () => {
     }
   ];
 
-  return (
-    <div className="p-6 space-y-6">
-      {/* Page Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <h1 className="text-3xl font-bold text-text-primary mb-2">Dashboard Overview</h1>
-        <p className="text-text-secondary text-lg">
-          Welcome back! Here's what's happening with your pharmacy today.
-        </p>
-      </motion.div>
+      return (
+        <div className="p-6 space-y-6">
+          {/* Data Source Banner */}
+          {!isApiAvailable && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4"
+            >
+              <div className="flex items-center space-x-3">
+                <AlertTriangle className="text-yellow-500" size={20} />
+                <div>
+                  <h3 className="text-yellow-500 font-semibold">Working with Local Data</h3>
+                  <p className="text-yellow-400 text-sm">
+                    Backend server is not connected. All changes are saved locally and will be lost on page refresh.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Page Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <h1 className="text-3xl font-bold text-text-primary mb-2">Dashboard Overview</h1>
+            <p className="text-text-secondary text-lg">
+              Welcome back! Here's what's happening with your pharmacy today.
+            </p>
+          </motion.div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

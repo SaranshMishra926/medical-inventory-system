@@ -13,8 +13,10 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react';
+import { useInventory } from '../context/InventoryContext';
 
 const SuppliersManagement = () => {
+  const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useInventory();
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
@@ -27,68 +29,11 @@ const SuppliersManagement = () => {
     status: 'Active'
   });
 
-  // Sample suppliers data
-  const suppliersData = [
-  {
-    id: 1,
-      supplierName: 'HealthPlus Pharmaceuticals',
-      contact: 'John Smith',
-    email: 'john@healthplus.com',
-      phone: '+1 (555) 123-4567',
-      address: '123 Medical Ave, Health City, HC 12345',
-      lastOrder: '2024-01-15',
-      status: 'Active',
-      totalOrders: 45
-  },
-  {
-    id: 2,
-      supplierName: 'BioMed Solutions',
-      contact: 'Sarah Johnson',
-      email: 'sarah@biomed.com',
-      phone: '+1 (555) 234-5678',
-      address: '456 Pharma St, Medical District, MD 67890',
-      lastOrder: '2024-01-12',
-      status: 'Active',
-      totalOrders: 32
-  },
-  {
-    id: 3,
-      supplierName: 'NutriLife Corp',
-      contact: 'Mike Davis',
-      email: 'mike@nutrilife.com',
-      phone: '+1 (555) 345-6789',
-      address: '789 Wellness Blvd, Health Town, HT 54321',
-      lastOrder: '2024-01-08',
-      status: 'Inactive',
-      totalOrders: 18
-  },
-  {
-    id: 4,
-      supplierName: 'MediCore Industries',
-      contact: 'Lisa Wilson',
-      email: 'lisa@medicore.com',
-      phone: '+1 (555) 456-7890',
-      address: '321 Healthcare Dr, Pharma City, PC 98765',
-      lastOrder: '2024-01-10',
-      status: 'Active',
-      totalOrders: 28
-  },
-  {
-    id: 5,
-      supplierName: 'VitaHealth Ltd',
-      contact: 'David Brown',
-      email: 'david@vitahealth.com',
-      phone: '+1 (555) 567-8901',
-      address: '654 Medicine Way, Wellness Valley, WV 13579',
-      lastOrder: '2024-01-05',
-      status: 'Inactive',
-      totalOrders: 12
-    }
-  ];
-
-  const filteredData = suppliersData.filter(supplier => {
-    return supplier.supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           supplier.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
+  const filteredData = suppliers.filter(supplier => {
+    const contactName = supplier.contactPerson || supplier.contact || '';
+    const supplierName = supplier.name || supplier.supplierName || '';
+    return supplierName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           contactName.toLowerCase().includes(searchQuery.toLowerCase()) ||
            supplier.email.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
@@ -116,10 +61,12 @@ const SuppliersManagement = () => {
   const handleEdit = (supplier) => {
     setEditingSupplier(supplier);
     setFormData({
-      supplierName: supplier.supplierName,
-      contact: supplier.contact,
+      supplierName: supplier.name || supplier.supplierName,
+      contact: supplier.contactPerson || supplier.contact,
       email: supplier.email,
-      address: supplier.address,
+      address: typeof supplier.address === 'object' 
+        ? `${supplier.address.street}, ${supplier.address.city}, ${supplier.address.state} ${supplier.address.zipCode}, ${supplier.address.country}`
+        : supplier.address,
       phone: supplier.phone,
       status: supplier.status
     });
@@ -337,17 +284,17 @@ const SuppliersManagement = () => {
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-white mb-1">
-                  {supplier.supplierName}
+                  {supplier.name || supplier.supplierName}
                 </h3>
                 <p className="text-gray-400 text-sm mb-2">
-                  {supplier.contact}
+                  {supplier.contactPerson || supplier.contact}
                 </p>
                 <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  supplier.status === 'Active' 
+                  supplier.status === 'active' 
                     ? 'text-green-400 bg-green-400/10' 
                     : 'text-red-400 bg-red-400/10'
                 }`}>
-                  {supplier.status === 'Active' ? (
+                  {supplier.status === 'active' ? (
                     <CheckCircle size={12} className="mr-1" />
                   ) : (
                     <XCircle size={12} className="mr-1" />
@@ -382,14 +329,19 @@ const SuppliersManagement = () => {
               </div>
               <div className="flex items-start text-gray-300 text-sm">
                 <MapPin size={16} className="mr-2 text-gray-400 mt-0.5 flex-shrink-0" />
-                <span className="text-xs">{supplier.address}</span>
+                <span className="text-xs">
+                  {typeof supplier.address === 'object' 
+                    ? `${supplier.address.street}, ${supplier.address.city}, ${supplier.address.state} ${supplier.address.zipCode}, ${supplier.address.country}`
+                    : supplier.address
+                  }
+                </span>
               </div>
               <div className="flex items-center justify-between text-gray-400 text-xs pt-2 border-t border-dark-border">
                 <div className="flex items-center">
                   <Calendar size={14} className="mr-1" />
-                  <span>Last Order: {new Date(supplier.lastOrder).toLocaleDateString()}</span>
+                  <span>Last Order: {supplier.lastOrder ? new Date(supplier.lastOrder).toLocaleDateString() : 'N/A'}</span>
                 </div>
-                <span>{supplier.totalOrders} orders</span>
+                <span>{supplier.totalOrders || 0} orders</span>
               </div>
             </div>
           </motion.div>
@@ -399,9 +351,9 @@ const SuppliersManagement = () => {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { title: 'Total Suppliers', value: suppliersData.length, icon: CheckCircle },
-          { title: 'Active Suppliers', value: suppliersData.filter(s => s.status === 'Active').length, icon: CheckCircle },
-          { title: 'Inactive Suppliers', value: suppliersData.filter(s => s.status === 'Inactive').length, icon: XCircle }
+          { title: 'Total Suppliers', value: suppliers.length, icon: CheckCircle },
+          { title: 'Active Suppliers', value: suppliers.filter(s => s.status === 'active').length, icon: CheckCircle },
+          { title: 'Inactive Suppliers', value: suppliers.filter(s => s.status === 'inactive').length, icon: XCircle }
         ].map((summary, index) => {
           const Icon = summary.icon;
           return (

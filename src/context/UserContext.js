@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useUser as useClerkUser } from '@clerk/clerk-react';
 
 const UserContext = createContext();
 
@@ -11,40 +12,40 @@ export const useUser = () => {
 };
 
 export const UserProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('meditrack-user');
-    if (savedUser) {
-      return JSON.parse(savedUser);
-    }
-    return {
-      fullName: 'Dr. Sarah Johnson',
-      email: 'sarah.johnson@meditrack.com',
-      role: 'Administrator',
-      profilePicture: null,
-      permissions: {
-        dashboard: true,
-        inventory: true,
-        orders: true,
-        suppliers: true,
-        reports: true,
-        settings: true
-      }
-    };
+  const { user: clerkUser, isSignedIn, isLoaded } = useClerkUser();
+  const [user, setUser] = useState(null);
+  const [notifications, setNotifications] = useState({
+    orderUpdates: true,
+    lowStockAlerts: true,
+    expiryReminders: true,
+    supplierMessages: false,
+    systemUpdates: true
   });
 
-  const [notifications, setNotifications] = useState(() => {
-    const savedNotifications = localStorage.getItem('meditrack-notifications');
-    if (savedNotifications) {
-      return JSON.parse(savedNotifications);
+  // Sync Clerk user with local user state
+  useEffect(() => {
+    if (isLoaded && isSignedIn && clerkUser) {
+      const userData = {
+        id: clerkUser.id,
+        fullName: clerkUser.fullName || `${clerkUser.firstName} ${clerkUser.lastName}`,
+        email: clerkUser.primaryEmailAddress?.emailAddress,
+        firstName: clerkUser.firstName,
+        lastName: clerkUser.lastName,
+        profilePicture: clerkUser.profileImageUrl,
+        role: clerkUser.publicMetadata?.role || 'Administrator',
+        permissions: getRolePermissions(clerkUser.publicMetadata?.role || 'Administrator'),
+        createdAt: clerkUser.createdAt,
+        lastSignInAt: clerkUser.lastSignInAt
+      };
+      setUser(userData);
+      
+      // Save to localStorage for persistence
+      localStorage.setItem('meditrack-user', JSON.stringify(userData));
+    } else if (isLoaded && !isSignedIn) {
+      setUser(null);
+      localStorage.removeItem('meditrack-user');
     }
-    return {
-      orderUpdates: true,
-      lowStockAlerts: true,
-      expiryReminders: true,
-      supplierMessages: false,
-      systemUpdates: true
-    };
-  });
+  }, [clerkUser, isSignedIn, isLoaded]);
 
   // Role-based permissions
   const getRolePermissions = (role) => {
@@ -73,6 +74,14 @@ export const UserProvider = ({ children }) => {
         reports: true,
         settings: false
       },
+      Staff: {
+        dashboard: true,
+        inventory: true,
+        orders: true,
+        suppliers: false,
+        reports: false,
+        settings: false
+      },
       Viewer: {
         dashboard: true,
         inventory: true,
@@ -85,8 +94,10 @@ export const UserProvider = ({ children }) => {
     return permissions[role] || permissions.Viewer;
   };
 
-  // Update user profile
-  const updateUser = (updates) => {
+  // Update user profile (this would typically sync with backend)
+  const updateUser = async (updates) => {
+    if (!user) return;
+    
     const newUser = { ...user, ...updates };
     
     // Update permissions if role changed
@@ -96,6 +107,27 @@ export const UserProvider = ({ children }) => {
     
     setUser(newUser);
     localStorage.setItem('meditrack-user', JSON.stringify(newUser));
+    
+    // Here you would typically make an API call to update the user in your backend
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await clerkUser.getToken()}`
+        },
+        body: JSON.stringify(updates)
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update user');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      // Revert changes on error
+      setUser(user);
+      localStorage.setItem('meditrack-user', JSON.stringify(user));
+    }
   };
 
   // Update notifications
@@ -107,35 +139,16 @@ export const UserProvider = ({ children }) => {
 
   // Check if user has permission for a specific page
   const hasPermission = (page) => {
-    return user.permissions[page] || false;
+    return user?.permissions?.[page] || false;
   };
 
-  // Logout function
+  // Logout function (handled by Clerk)
   const logout = () => {
+    // Clerk handles logout automatically
+    setUser(null);
     localStorage.removeItem('meditrack-user');
     localStorage.removeItem('meditrack-notifications');
     localStorage.removeItem('meditrack-theme');
-    setUser({
-      fullName: 'Dr. Sarah Johnson',
-      email: 'sarah.johnson@meditrack.com',
-      role: 'Administrator',
-      profilePicture: null,
-      permissions: {
-        dashboard: true,
-        inventory: true,
-        orders: true,
-        suppliers: true,
-        reports: true,
-        settings: true
-      }
-    });
-    setNotifications({
-      orderUpdates: true,
-      lowStockAlerts: true,
-      expiryReminders: true,
-      supplierMessages: false,
-      systemUpdates: true
-    });
   };
 
   // Reset all settings
@@ -152,7 +165,9 @@ export const UserProvider = ({ children }) => {
     hasPermission,
     logout,
     resetAllSettings,
-    getRolePermissions
+    getRolePermissions,
+    isSignedIn,
+    isLoaded
   };
 
   return (

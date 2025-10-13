@@ -17,7 +17,7 @@ import { useDebounce, getStatusColor, formatDate, validateForm } from '../utils'
 import Card from '../components/Card';
 
 const Suppliers = () => {
-  const { suppliers, addSupplier, updateSupplier, deleteSupplier } = useInventory();
+  const { suppliers, addSupplier, updateSupplier, deleteSupplier, isApiAvailable } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -30,6 +30,7 @@ const Suppliers = () => {
     address: ''
   });
   const [errors, setErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState('');
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -68,8 +69,14 @@ const Suppliers = () => {
     setIsModalOpen(true);
   };
 
-  const handleDeleteSupplier = (supplierId) => {
-    deleteSupplier(supplierId);
+  const handleDeleteSupplier = async (supplierId) => {
+    try {
+      await deleteSupplier(supplierId);
+      setSuccessMessage('Supplier deleted successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error('Error deleting supplier:', error);
+    }
     setShowDeleteConfirm(null);
   };
 
@@ -83,7 +90,7 @@ const Suppliers = () => {
     }
   };
 
-  const handleSubmitSupplier = (e) => {
+  const handleSubmitSupplier = async (e) => {
     e.preventDefault();
     
     const requiredFields = ['name', 'contact', 'email', 'phone'];
@@ -94,12 +101,19 @@ const Suppliers = () => {
       return;
     }
 
-    if (editingSupplier) {
-      updateSupplier(editingSupplier.id, formData);
-    } else {
-      addSupplier(formData);
+    try {
+      if (editingSupplier) {
+        await updateSupplier(editingSupplier._id, formData);
+        setSuccessMessage('Supplier updated successfully!');
+      } else {
+        await addSupplier(formData);
+        setSuccessMessage('Supplier added successfully!');
+      }
+      setTimeout(() => setSuccessMessage(''), 3000);
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error saving supplier:', error);
     }
-    setIsModalOpen(false);
   };
 
   return (
@@ -107,6 +121,40 @@ const Suppliers = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-900">
           <div className="p-6 space-y-6">
+            {/* Data Source Banner */}
+            {!isApiAvailable && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4"
+              >
+                <div className="flex items-center space-x-3">
+                  <Package className="text-yellow-500" size={20} />
+                  <div>
+                    <h3 className="text-yellow-500 font-semibold">Working with Local Data</h3>
+                    <p className="text-yellow-400 text-sm">
+                      Backend server is not connected. All changes are saved locally and will be lost on page refresh.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Success Message */}
+            {successMessage && (
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="bg-green-500/10 border border-green-500/20 rounded-lg p-4"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <p className="text-green-500 font-medium">{successMessage}</p>
+                </div>
+              </motion.div>
+            )}
             {/* Page Header */}
             <motion.div
               initial={{ opacity: 0, y: -20 }}
@@ -219,7 +267,12 @@ const Suppliers = () => {
                     </div>
                     <div className="flex items-center space-x-3">
                       <MapPin size={16} className="text-gray-400" />
-                      <span className="text-sm text-gray-300">{supplier.address}</span>
+                      <span className="text-sm text-gray-300">
+                        {typeof supplier.address === 'object' 
+                          ? `${supplier.address.street}, ${supplier.address.city}, ${supplier.address.state} ${supplier.address.zipCode}, ${supplier.address.country}`
+                          : supplier.address
+                        }
+                      </span>
                     </div>
                     {supplier.lastOrder && (
                       <div className="flex items-center space-x-3">

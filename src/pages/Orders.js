@@ -11,14 +11,15 @@ import {
   DollarSign,
   X,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { useDebounce, getStatusColor, formatDate, formatCurrency } from '../utils';
 import Card from '../components/Card';
 
 const Orders = () => {
-  const { orders, addOrder, deleteOrder } = useInventory();
+  const { orders, addOrder, deleteOrder, isApiAvailable } = useInventory();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
@@ -27,6 +28,7 @@ const Orders = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [formErrors, setFormErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -41,11 +43,15 @@ const Orders = () => {
 
   // Filter orders based on search and filters
   const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.supplierName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                         order.medicineName.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                         order.id.toString().includes(debouncedSearch);
+    const supplierName = order.supplierName || order.supplier || '';
+    const medicineNames = order.medicineName || (order.medicines && order.medicines.map(m => m.medicine).join(' ')) || '';
+    const orderNumber = order.orderNumber || order.id || '';
     
-    const matchesStatus = filterStatus === 'All' || order.status === filterStatus;
+    const matchesSearch = supplierName.toString().toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                         medicineNames.toString().toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                         orderNumber.toString().toLowerCase().includes(debouncedSearch.toLowerCase());
+    
+    const matchesStatus = filterStatus === 'All' || order.status === filterStatus || order.status === filterStatus.toLowerCase();
     
     return matchesSearch && matchesStatus;
   });
@@ -144,8 +150,14 @@ const Orders = () => {
   };
 
   // Handle delete order
-  const handleDeleteOrder = (orderId) => {
-    deleteOrder(orderId);
+  const handleDeleteOrder = async (orderId) => {
+    try {
+      await deleteOrder(orderId);
+      setSuccessMessage('Order deleted successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error('Error deleting order:', error);
+    }
     setShowDeleteConfirm(null);
   };
 
@@ -167,6 +179,40 @@ const Orders = () => {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Data Source Banner */}
+      {!isApiAvailable && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4"
+        >
+          <div className="flex items-center space-x-3">
+            <AlertTriangle className="text-yellow-500" size={20} />
+            <div>
+              <h3 className="text-yellow-500 font-semibold">Working with Local Data</h3>
+              <p className="text-yellow-400 text-sm">
+                Backend server is not connected. All changes are saved locally and will be lost on page refresh.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Success Message */}
+      {successMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="bg-green-500/10 border border-green-500/20 rounded-lg p-4"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <p className="text-green-500 font-medium">{successMessage}</p>
+          </div>
+        </motion.div>
+      )}
       {/* Page Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -241,7 +287,7 @@ const Orders = () => {
             <div>
               <p className="text-gray-400 text-sm">Pending Orders</p>
               <p className="text-2xl font-bold text-white">
-                {orders.filter(order => order.status === 'Pending').length}
+                {orders.filter(order => order.status === 'pending' || order.status === 'Pending').length}
               </p>
             </div>
             <div className="p-3 bg-yellow-500 rounded-lg">
@@ -255,7 +301,7 @@ const Orders = () => {
             <div>
               <p className="text-gray-400 text-sm">Delivered Orders</p>
               <p className="text-2xl font-bold text-white">
-                {orders.filter(order => order.status === 'Delivered').length}
+                {orders.filter(order => order.status === 'delivered' || order.status === 'Delivered').length}
               </p>
             </div>
             <div className="p-3 bg-green-500 rounded-lg">
@@ -269,7 +315,7 @@ const Orders = () => {
             <div>
               <p className="text-gray-400 text-sm">Total Value</p>
               <p className="text-2xl font-bold text-white">
-                {formatCurrency(orders.reduce((sum, order) => sum + order.total, 0))}
+                {formatCurrency(orders.reduce((sum, order) => sum + (order.total || order.totalAmount || 0), 0))}
               </p>
             </div>
             <div className="p-3 bg-primary-500 rounded-lg">
@@ -494,22 +540,22 @@ const Orders = () => {
                     transition={{ duration: 0.3, delay: index * 0.05 }}
                     className="border-b border-border-primary hover:bg-background-tertiary transition-colors"
                   >
-                    <td className="py-4 px-4 text-text-primary font-medium">#{order.id}</td>
-                    <td className="py-4 px-4 text-text-primary">{order.medicineName}</td>
-                    <td className="py-4 px-4 text-text-primary">{order.quantity}</td>
-                    <td className="py-4 px-4 text-text-primary">{order.supplierName}</td>
+                    <td className="py-4 px-4 text-text-primary font-medium">#{order.orderNumber || order.id}</td>
+                    <td className="py-4 px-4 text-text-primary">{order.medicineName || (order.items && order.items.map(m => m.medicine?.name || 'N/A').join(', ')) || 'N/A'}</td>
+                    <td className="py-4 px-4 text-text-primary">{order.quantity || (order.items && order.items.reduce((sum, m) => sum + m.quantity, 0)) || 'N/A'}</td>
+                    <td className="py-4 px-4 text-text-primary">{order.supplierName || order.supplier?.name || 'N/A'}</td>
                     <td className="py-4 px-4 text-text-primary">{formatDate(order.orderDate)}</td>
                     <td className="py-4 px-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        order.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                        order.status === 'Approved' ? 'bg-blue-500/20 text-blue-400' :
-                        order.status === 'Delivered' ? 'bg-green-500/20 text-green-400' :
+                        order.status === 'pending' || order.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                        order.status === 'approved' || order.status === 'Approved' ? 'bg-blue-500/20 text-blue-400' :
+                        order.status === 'delivered' || order.status === 'Delivered' ? 'bg-green-500/20 text-green-400' :
                         'bg-red-500/20 text-red-400'
                       }`}>
                         {order.status}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-text-primary">{formatCurrency(order.total)}</td>
+                    <td className="py-4 px-4 text-text-primary">{formatCurrency(order.total || order.totalAmount || 0)}</td>
                     <td className="py-4 px-4">
                       <div className="flex items-center space-x-2">
                         <button

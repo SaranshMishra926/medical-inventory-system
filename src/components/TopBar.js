@@ -2,9 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Bell, User, Moon, Sun, LogOut, Settings } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
+import { useUser } from '../context/UserContext';
+import { useClerk } from '@clerk/clerk-react';
 
 const TopBar = () => {
   const { theme, toggleTheme, alerts } = useInventory();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,9 +31,13 @@ const TopBar = () => {
     setShowProfileDropdown(false);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('meditrack-user');
-    window.location.href = '/landing';
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      // Clerk will handle the redirect
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   // Close dropdowns when clicking outside
@@ -139,12 +147,20 @@ const TopBar = () => {
             onClick={handleProfileClick}
             className="flex items-center space-x-3 p-2 hover:bg-background-tertiary rounded-lg transition-colors"
           >
-            <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
-              <User size={16} className="text-white" />
+            <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center overflow-hidden">
+              {user?.profilePicture ? (
+                <img 
+                  src={user.profilePicture} 
+                  alt={user.fullName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User size={16} className="text-white" />
+              )}
             </div>
             <div className="hidden md:block text-left">
-              <p className="text-sm font-medium text-text-primary">Dr. Sarah Johnson</p>
-              <p className="text-xs text-text-secondary">Administrator</p>
+              <p className="text-sm font-medium text-text-primary">{user?.fullName || 'User'}</p>
+              <p className="text-xs text-text-secondary">{user?.role || 'Staff'}</p>
             </div>
           </button>
 

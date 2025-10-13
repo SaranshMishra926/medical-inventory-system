@@ -1,19 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Package } from 'lucide-react';
-import { validateForm } from '../utils';
 
 const MedicineModal = ({ isOpen, onClose, onSubmit, medicine = null, suppliers = [] }) => {
   const [formData, setFormData] = useState({
     name: '',
-    generic: '',
-    dosage: '',
-    quantity: '',
-    threshold: '',
-    expiryDate: '',
-    supplier: '',
+    genericName: '',
     category: '',
-    manufacturer: ''
+    manufacturer: '',
+    batchNumber: '',
+    expiryDate: '',
+    quantity: '',
+    unit: 'tablets',
+    unitPrice: '',
+    totalPrice: '',
+    location: '',
+    minimumStockLevel: '',
+    maximumStockLevel: '',
+    description: '',
+    supplier: '',
+    isActive: true
   });
   const [errors, setErrors] = useState({});
 
@@ -21,67 +27,86 @@ const MedicineModal = ({ isOpen, onClose, onSubmit, medicine = null, suppliers =
     if (medicine) {
       setFormData({
         name: medicine.name || '',
-        generic: medicine.generic || '',
-        dosage: medicine.dosage || '',
-        quantity: medicine.quantity || '',
-        threshold: medicine.threshold || '',
-        expiryDate: medicine.expiryDate || '',
-        supplier: medicine.supplier || '',
+        genericName: medicine.genericName || '',
         category: medicine.category || '',
-        manufacturer: medicine.manufacturer || ''
+        manufacturer: medicine.manufacturer || '',
+        batchNumber: medicine.batchNumber || '',
+        expiryDate: medicine.expiryDate || '',
+        quantity: medicine.quantity || '',
+        unit: medicine.unit || 'tablets',
+        unitPrice: medicine.unitPrice || '',
+        totalPrice: medicine.totalPrice || '',
+        location: medicine.location || '',
+        minimumStockLevel: medicine.minimumStockLevel || '',
+        maximumStockLevel: medicine.maximumStockLevel || '',
+        description: medicine.description || '',
+        supplier: medicine.supplier?._id || medicine.supplier || '',
+        isActive: medicine.isActive !== undefined ? medicine.isActive : true
       });
     } else {
       setFormData({
         name: '',
-        generic: '',
-        dosage: '',
-        quantity: '',
-        threshold: '',
-        expiryDate: '',
-        supplier: '',
+        genericName: '',
         category: '',
-        manufacturer: ''
+        manufacturer: '',
+        batchNumber: '',
+        expiryDate: '',
+        quantity: '',
+        unit: 'tablets',
+        unitPrice: '',
+        totalPrice: '',
+        location: '',
+        minimumStockLevel: '',
+        maximumStockLevel: '',
+        description: '',
+        supplier: '',
+        isActive: true
       });
     }
     setErrors({});
   }, [medicine, isOpen]);
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
     
     // Clear error when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
     }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    const requiredFields = ['name', 'generic', 'dosage', 'quantity', 'threshold', 'expiryDate', 'supplier'];
-    const validationErrors = validateForm(formData, requiredFields);
+    // Basic validation
+    const newErrors = {};
     
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+    if (!formData.name.trim()) newErrors.name = 'Medicine name is required';
+    if (!formData.category) newErrors.category = 'Category is required';
+    if (!formData.manufacturer.trim()) newErrors.manufacturer = 'Manufacturer is required';
+    if (!formData.batchNumber.trim()) newErrors.batchNumber = 'Batch number is required';
+    if (!formData.expiryDate) newErrors.expiryDate = 'Expiry date is required';
+    if (!formData.quantity || formData.quantity <= 0) newErrors.quantity = 'Valid quantity is required';
+    if (!formData.unit) newErrors.unit = 'Unit is required';
+    if (!formData.unitPrice || formData.unitPrice <= 0) newErrors.unitPrice = 'Valid unit price is required';
+    if (!formData.totalPrice || formData.totalPrice <= 0) newErrors.totalPrice = 'Valid total price is required';
+    if (!formData.location.trim()) newErrors.location = 'Location is required';
+    if (!formData.supplier) newErrors.supplier = 'Supplier is required';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
-
+    
     onSubmit(formData);
-    onClose();
   };
-
-  const categories = [
-    'Antibiotic',
-    'Pain Relief',
-    'Fever Reducer',
-    'Blood Pressure',
-    'Diabetes',
-    'Heart Medication',
-    'Respiratory',
-    'Digestive',
-    'Other'
-  ];
 
   return (
     <AnimatePresence>
@@ -97,7 +122,7 @@ const MedicineModal = ({ isOpen, onClose, onSubmit, medicine = null, suppliers =
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gray-800 border border-gray-700 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
+            className="bg-gray-800 border border-gray-700 rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -140,53 +165,88 @@ const MedicineModal = ({ isOpen, onClose, onSubmit, medicine = null, suppliers =
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Generic Name *
+                    Generic Name
                   </label>
                   <input
                     type="text"
-                    name="generic"
-                    value={formData.generic}
+                    name="genericName"
+                    value={formData.genericName}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
-                      errors.generic ? 'border-red-500' : 'border-gray-600'
-                    }`}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
                     placeholder="e.g., Amoxicillin Trihydrate"
                   />
-                  {errors.generic && <p className="text-red-400 text-xs mt-1">{errors.generic}</p>}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Dosage *
-                  </label>
-                  <input
-                    type="text"
-                    name="dosage"
-                    value={formData.dosage}
-                    onChange={handleInputChange}
-                    className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
-                      errors.dosage ? 'border-red-500' : 'border-gray-600'
-                    }`}
-                    placeholder="e.g., 500mg"
-                  />
-                  {errors.dosage && <p className="text-red-400 text-xs mt-1">{errors.dosage}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Category
+                    Category *
                   </label>
                   <select
                     name="category"
                     value={formData.category}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                    className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                      errors.category ? 'border-red-500' : 'border-gray-600'
+                    }`}
                   >
                     <option value="">Select Category</option>
-                    {categories.map(category => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
+                    <option value="Prescription">Prescription</option>
+                    <option value="Over-the-Counter">Over-the-Counter</option>
+                    <option value="Controlled Substance">Controlled Substance</option>
+                    <option value="Medical Device">Medical Device</option>
+                    <option value="Supplies">Supplies</option>
                   </select>
+                  {errors.category && <p className="text-red-400 text-xs mt-1">{errors.category}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Manufacturer *
+                  </label>
+                  <input
+                    type="text"
+                    name="manufacturer"
+                    value={formData.manufacturer}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                      errors.manufacturer ? 'border-red-500' : 'border-gray-600'
+                    }`}
+                    placeholder="e.g., Pfizer"
+                  />
+                  {errors.manufacturer && <p className="text-red-400 text-xs mt-1">{errors.manufacturer}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Batch Number *
+                  </label>
+                  <input
+                    type="text"
+                    name="batchNumber"
+                    value={formData.batchNumber}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                      errors.batchNumber ? 'border-red-500' : 'border-gray-600'
+                    }`}
+                    placeholder="e.g., BATCH001"
+                  />
+                  {errors.batchNumber && <p className="text-red-400 text-xs mt-1">{errors.batchNumber}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Expiry Date *
+                  </label>
+                  <input
+                    type="date"
+                    name="expiryDate"
+                    value={formData.expiryDate}
+                    onChange={handleInputChange}
+                    className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                      errors.expiryDate ? 'border-red-500' : 'border-gray-600'
+                    }`}
+                  />
+                  {errors.expiryDate && <p className="text-red-400 text-xs mt-1">{errors.expiryDate}</p>}
                 </div>
 
                 <div>
@@ -209,36 +269,111 @@ const MedicineModal = ({ isOpen, onClose, onSubmit, medicine = null, suppliers =
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Threshold *
+                    Unit *
                   </label>
-                  <input
-                    type="number"
-                    name="threshold"
-                    value={formData.threshold}
+                  <select
+                    name="unit"
+                    value={formData.unit}
                     onChange={handleInputChange}
-                    min="0"
                     className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
-                      errors.threshold ? 'border-red-500' : 'border-gray-600'
+                      errors.unit ? 'border-red-500' : 'border-gray-600'
                     }`}
-                    placeholder="Minimum stock level"
-                  />
-                  {errors.threshold && <p className="text-red-400 text-xs mt-1">{errors.threshold}</p>}
+                  >
+                    <option value="tablets">Tablets</option>
+                    <option value="capsules">Capsules</option>
+                    <option value="ml">ML</option>
+                    <option value="mg">MG</option>
+                    <option value="units">Units</option>
+                    <option value="vials">Vials</option>
+                    <option value="boxes">Boxes</option>
+                    <option value="strips">Strips</option>
+                  </select>
+                  {errors.unit && <p className="text-red-400 text-xs mt-1">{errors.unit}</p>}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Expiry Date *
+                    Unit Price *
                   </label>
                   <input
-                    type="date"
-                    name="expiryDate"
-                    value={formData.expiryDate}
+                    type="number"
+                    name="unitPrice"
+                    value={formData.unitPrice}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.01"
+                    className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                      errors.unitPrice ? 'border-red-500' : 'border-gray-600'
+                    }`}
+                    placeholder="Price per unit"
+                  />
+                  {errors.unitPrice && <p className="text-red-400 text-xs mt-1">{errors.unitPrice}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Total Price *
+                  </label>
+                  <input
+                    type="number"
+                    name="totalPrice"
+                    value={formData.totalPrice}
+                    onChange={handleInputChange}
+                    min="0"
+                    step="0.01"
+                    className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
+                      errors.totalPrice ? 'border-red-500' : 'border-gray-600'
+                    }`}
+                    placeholder="Total price (quantity × unit price)"
+                  />
+                  {errors.totalPrice && <p className="text-red-400 text-xs mt-1">{errors.totalPrice}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Location *
+                  </label>
+                  <input
+                    type="text"
+                    name="location"
+                    value={formData.location}
                     onChange={handleInputChange}
                     className={`w-full px-3 py-2 bg-gray-700 border rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors ${
-                      errors.expiryDate ? 'border-red-500' : 'border-gray-600'
+                      errors.location ? 'border-red-500' : 'border-gray-600'
                     }`}
+                    placeholder="e.g., A-01-01"
                   />
-                  {errors.expiryDate && <p className="text-red-400 text-xs mt-1">{errors.expiryDate}</p>}
+                  {errors.location && <p className="text-red-400 text-xs mt-1">{errors.location}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Minimum Stock Level
+                  </label>
+                  <input
+                    type="number"
+                    name="minimumStockLevel"
+                    value={formData.minimumStockLevel}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                    placeholder="Minimum stock level"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Maximum Stock Level
+                  </label>
+                  <input
+                    type="number"
+                    name="maximumStockLevel"
+                    value={formData.maximumStockLevel}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                    placeholder="Maximum stock level"
+                  />
                 </div>
 
                 <div>
@@ -255,39 +390,39 @@ const MedicineModal = ({ isOpen, onClose, onSubmit, medicine = null, suppliers =
                   >
                     <option value="">Select Supplier</option>
                     {suppliers.map(supplier => (
-                      <option key={supplier.id} value={supplier.name}>{supplier.name}</option>
+                      <option key={supplier._id} value={supplier._id}>{supplier.name}</option>
                     ))}
                   </select>
                   {errors.supplier && <p className="text-red-400 text-xs mt-1">{errors.supplier}</p>}
                 </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Manufacturer
-                  </label>
-                  <input
-                    type="text"
-                    name="manufacturer"
-                    value={formData.manufacturer}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
-                    placeholder="e.g., HealthPlus Pharma"
-                  />
-                </div>
               </div>
 
-              {/* Form Actions */}
-              <div className="flex justify-end space-x-3 pt-6 border-t border-gray-700">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  rows="3"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                  placeholder="Additional notes or description"
+                />
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-6 py-2 border border-gray-600 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+                  className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
+                  className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
                 >
                   {medicine ? 'Update Medicine' : 'Add Medicine'}
                 </button>

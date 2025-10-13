@@ -28,6 +28,10 @@ export const formatCurrency = (amount) => {
 
 // Get status color for badges
 export const getStatusColor = (status) => {
+  if (!status) {
+    return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+  }
+  
   switch (status.toLowerCase()) {
     case 'low stock':
       return 'bg-orange-500/20 text-orange-300 border-orange-500/30';

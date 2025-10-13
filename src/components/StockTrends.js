@@ -6,12 +6,12 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 const StockTrends = () => {
   // Sample data for Medicine Stock Levels chart
   const stockLevelsData = [
-    { month: 'Jan', stock: 1200 },
-    { month: 'Feb', stock: 1350 },
-    { month: 'Mar', stock: 1280 },
-    { month: 'Apr', stock: 1450 },
-    { month: 'May', stock: 1380 },
-    { month: 'Jun', stock: 1420 }
+    { month: 'Jun', stock: 120 },
+    { month: 'Jul', stock: 135 },
+    { month: 'Aug', stock: 128 },
+    { month: 'Sept', stock: 145 },
+    { month: 'Oct', stock: 138 },
+    { month: 'Nov', stock: 0 }
   ];
 
   // Sample data for Top 5 Medicines chart

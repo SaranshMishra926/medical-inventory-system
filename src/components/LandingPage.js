@@ -46,7 +46,7 @@ const LandingPage = () => {
 
   const testimonials = [
     {
-      name: 'Dr. Sarah Johnson',
+      name: 'MR SARANSH MISHRA',
       role: 'Chief Pharmacist',
       company: 'CityCare Pharmacy',
       content: 'MediTrack has revolutionized our inventory management. We\'ve reduced waste by 40% and never run out of critical medicines.',
@@ -54,7 +54,7 @@ const LandingPage = () => {
       rating: 5
     },
     {
-      name: 'Michael Chen',
+      name: 'MR SURESH BYALLA',
       role: 'Hospital Administrator',
       company: 'Metro General Hospital',
       content: 'The analytics dashboard gives us insights we never had before. Our procurement team is now data-driven.',
@@ -62,7 +62,7 @@ const LandingPage = () => {
       rating: 5
     },
     {
-      name: 'Priya Nair',
+      name: 'MR AARUSH GAUR',
       role: 'Pharmacy Manager',
       company: 'HealthPlus Chain',
       content: 'The expiry alerts have saved us thousands in expired medicine costs. Highly recommended!',

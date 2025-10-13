@@ -15,24 +15,32 @@ import Card from '../components/Card';
 import MedicineModal from '../components/MedicineModal';
 
 const Inventory = () => {
-  const { medicines, suppliers, addMedicine, updateMedicine, deleteMedicine } = useInventory();
+  const { medicines, suppliers, addMedicine, updateMedicine, deleteMedicine, isApiAvailable } = useInventory();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMedicine, setEditingMedicine] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [filterCategory, setFilterCategory] = useState('All');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
   // Filter medicines based on search and filters
   const filteredMedicines = medicines.filter(medicine => {
-    const matchesSearch = medicine.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                         medicine.generic.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                         medicine.category.toLowerCase().includes(debouncedSearch.toLowerCase());
+    const name = medicine.name || '';
+    const generic = medicine.generic || medicine.genericName || '';
+    const category = medicine.category || '';
     
-    const matchesStatus = filterStatus === 'All' || medicine.status === filterStatus;
-    const matchesCategory = filterCategory === 'All' || medicine.category === filterCategory;
+    const matchesSearch = name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                         generic.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                         category.toLowerCase().includes(debouncedSearch.toLowerCase());
+    
+    const matchesStatus = filterStatus === 'All' || 
+      (filterStatus === 'Active' && medicine.isActive === true) ||
+      (filterStatus === 'Inactive' && medicine.isActive === false) ||
+      (medicine.status && medicine.status === filterStatus);
+    const matchesCategory = filterCategory === 'All' || category === filterCategory;
     
     return matchesSearch && matchesStatus && matchesCategory;
   });
@@ -47,18 +55,31 @@ const Inventory = () => {
     setIsModalOpen(true);
   };
 
-  const handleDeleteMedicine = (medicineId) => {
-    deleteMedicine(medicineId);
+  const handleDeleteMedicine = async (medicineId) => {
+    try {
+      await deleteMedicine(medicineId);
+      setSuccessMessage('Medicine deleted successfully!');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error('Error deleting medicine:', error);
+    }
     setShowDeleteConfirm(null);
   };
 
-  const handleSubmitMedicine = (formData) => {
-    if (editingMedicine) {
-      updateMedicine(editingMedicine.id, formData);
-    } else {
-      addMedicine(formData);
+  const handleSubmitMedicine = async (formData) => {
+    try {
+      if (editingMedicine) {
+        await updateMedicine(editingMedicine._id, formData);
+        setSuccessMessage('Medicine updated successfully!');
+      } else {
+        await addMedicine(formData);
+        setSuccessMessage('Medicine added successfully!');
+      }
+      setTimeout(() => setSuccessMessage(''), 3000);
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error saving medicine:', error);
     }
-    setIsModalOpen(false);
   };
 
   const handleExportCSV = () => {
@@ -72,7 +93,7 @@ const Inventory = () => {
         medicine.threshold,
         medicine.status,
         medicine.expiryDate,
-        medicine.supplier
+        medicine.supplier?.name || 'N/A'
       ])
     ].map(row => row.join(',')).join('\n');
 
@@ -86,10 +107,44 @@ const Inventory = () => {
   };
 
   const categories = [...new Set(medicines.map(m => m.category).filter(Boolean))];
-  const statuses = ['All', 'Good', 'Low Stock'];
+  const statuses = ['All', 'Active', 'Inactive'];
 
   return (
     <div className="p-6 space-y-6">
+      {/* Data Source Banner */}
+      {!isApiAvailable && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4"
+        >
+          <div className="flex items-center space-x-3">
+            <AlertTriangle className="text-yellow-500" size={20} />
+            <div>
+              <h3 className="text-yellow-500 font-semibold">Working with Local Data</h3>
+              <p className="text-yellow-400 text-sm">
+                Backend server is not connected. All changes are saved locally and will be lost on page refresh.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Success Message */}
+      {successMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className="bg-green-500/10 border border-green-500/20 rounded-lg p-4"
+        >
+          <div className="flex items-center space-x-3">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <p className="text-green-500 font-medium">{successMessage}</p>
+          </div>
+        </motion.div>
+      )}
       {/* Page Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -259,8 +314,8 @@ const Inventory = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(medicine.status)}`}>
-                      {medicine.status}
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(medicine.isActive ? 'active' : 'inactive')}`}>
+                      {medicine.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

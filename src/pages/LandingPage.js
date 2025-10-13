@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useScroll, useTransform, useInView } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { SignInButton, SignUpButton, useUser } from '@clerk/clerk-react';
 import { 
   ArrowRight, 
   CheckCircle,
@@ -24,6 +25,7 @@ import {
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const { user, isSignedIn } = useUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   
@@ -63,15 +65,11 @@ const LandingPage = () => {
     setIsMenuOpen(false);
   };
 
-  // Demo login handler
-  const handleDemoLogin = () => {
-    localStorage.setItem('meditrack-user', JSON.stringify({
-      email: 'demo@meditrack.com',
-      name: 'Demo User',
-      role: 'Administrator',
-      loginTime: new Date().toISOString()
-    }));
-    navigate('/dashboard');
+  // Handle dashboard navigation for signed-in users
+  const handleDashboardAccess = () => {
+    if (isSignedIn) {
+      navigate('/dashboard');
+    }
   };
 
   // Feature data with icons and descriptions
@@ -189,22 +187,37 @@ const LandingPage = () => {
 
             {/* Action Buttons */}
             <div className="hidden md:flex items-center space-x-4">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => navigate('/login')}
-                className="px-6 py-2 text-gray-600 hover:text-gray-900 transition-colors font-medium"
-              >
-                Sign In
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleDemoLogin}
-                className="px-6 py-2 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-lg transition-all duration-300 font-medium"
-              >
-                Try Demo
-              </motion.button>
+              {isSignedIn ? (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleDashboardAccess}
+                  className="px-6 py-2 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-lg transition-all duration-300 font-medium"
+                >
+                  Dashboard
+                </motion.button>
+              ) : (
+                <>
+                  <SignInButton mode="modal">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-6 py-2 text-gray-600 hover:text-gray-900 transition-colors font-medium"
+                    >
+                      Sign In
+                    </motion.button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-6 py-2 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-lg transition-all duration-300 font-medium"
+                    >
+                      Get Started
+                    </motion.button>
+                  </SignUpButton>
+                </>
+              )}
             </div>
 
             {/* Mobile Menu Button */}
@@ -237,18 +250,27 @@ const LandingPage = () => {
                 </button>
               ))}
               <div className="pt-4 px-6 space-y-2 border-t border-gray-200">
-                <button
-                  onClick={() => navigate('/login')}
-                  className="block w-full text-left text-gray-600 hover:text-gray-900 transition-colors py-2"
-                >
-                  Sign In
-                </button>
-                <button
-                  onClick={handleDemoLogin}
-                  className="block w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-lg py-2 font-medium"
-                >
-                  Try Demo
-                </button>
+                {isSignedIn ? (
+                  <button
+                    onClick={handleDashboardAccess}
+                    className="block w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-lg py-2 font-medium"
+                  >
+                    Dashboard
+                  </button>
+                ) : (
+                  <>
+                    <SignInButton mode="modal">
+                      <button className="block w-full text-left text-gray-600 hover:text-gray-900 transition-colors py-2">
+                        Sign In
+                      </button>
+                    </SignInButton>
+                    <SignUpButton mode="modal">
+                      <button className="block w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-lg py-2 font-medium">
+                        Get Started
+                      </button>
+                    </SignUpButton>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
@@ -300,25 +322,40 @@ const LandingPage = () => {
             transition={{ duration: 0.8, delay: 0.8 }}
             className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16"
           >
-            <motion.button
-              whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => scrollToSection('features')}
-              className="group px-8 py-4 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-xl font-semibold text-lg transition-all duration-300 flex items-center space-x-2 shadow-lg"
-            >
-              <span>Get Started</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </motion.button>
-            
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => scrollToSection('demo')}
-              className="px-8 py-4 bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-500 hover:text-blue-600 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center space-x-2"
-            >
-              <Play className="w-5 h-5" />
-              <span>Learn More</span>
-            </motion.button>
+            {isSignedIn ? (
+              <motion.button
+                whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleDashboardAccess}
+                className="group px-8 py-4 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-xl font-semibold text-lg transition-all duration-300 flex items-center space-x-2 shadow-lg"
+              >
+                <span>Go to Dashboard</span>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </motion.button>
+            ) : (
+              <>
+                <SignUpButton mode="modal">
+                  <motion.button
+                    whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
+                    whileTap={{ scale: 0.95 }}
+                    className="group px-8 py-4 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-xl font-semibold text-lg transition-all duration-300 flex items-center space-x-2 shadow-lg"
+                  >
+                    <span>Get Started</span>
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </motion.button>
+                </SignUpButton>
+                
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => scrollToSection('demo')}
+                  className="px-8 py-4 bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-500 hover:text-blue-600 rounded-xl font-semibold text-lg transition-all duration-300 flex items-center space-x-2"
+                >
+                  <Play className="w-5 h-5" />
+                  <span>Learn More</span>
+                </motion.button>
+              </>
+            )}
           </motion.div>
 
           {/* Trust indicators */}
@@ -527,14 +564,26 @@ const LandingPage = () => {
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">Dashboard Preview</h3>
                 <p className="text-gray-600 mb-6">Real-time inventory tracking and analytics</p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleDemoLogin}
-                  className="px-8 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-lg font-semibold transition-all duration-300"
-                >
-                  Launch Full Demo
-                </motion.button>
+                {isSignedIn ? (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleDashboardAccess}
+                    className="px-8 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-lg font-semibold transition-all duration-300"
+                  >
+                    Go to Dashboard
+                  </motion.button>
+                ) : (
+                  <SignUpButton mode="modal">
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-8 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-lg font-semibold transition-all duration-300"
+                    >
+                      Get Started Free
+                    </motion.button>
+                  </SignUpButton>
+                )}
               </div>
             </div>
           </motion.div>
@@ -564,9 +613,9 @@ const LandingPage = () => {
           {/* Contact cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
             {[
-              { icon: Mail, title: 'Email Support', content: 'support@meditrack.com', color: 'from-primary-500 to-primary-600' },
-              { icon: Phone, title: 'Phone Support', content: '+1 (555) 123-4567', color: 'from-secondary-500 to-secondary-600' },
-              { icon: MapPin, title: 'Office Location', content: 'San Francisco, CA', color: 'from-primary-400 to-secondary-500' }
+              { icon: Mail, title: 'Email Support', content: 'saranshmishra1529@gmail.com, byallasuresh8@gmail.comc', color: 'from-primary-500 to-primary-600' },
+              { icon: Phone, title: 'Phone Support', content: '8433740051, 8263869367', color: 'from-secondary-500 to-secondary-600' },
+              { icon: MapPin, title: 'Office Location', content: 'Andheri, Mumbai, INDIA', color: 'from-primary-400 to-secondary-500' }
             ].map((contact, index) => {
               const Icon = contact.icon;
               return (
@@ -595,15 +644,27 @@ const LandingPage = () => {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="text-center"
           >
-            <motion.button
-              whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/login')}
-              className="px-12 py-4 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-xl font-bold text-xl transition-all duration-300 shadow-lg"
-            >
-              Request a Demo
-            </motion.button>
-            <p className="text-gray-500 mt-4">Free 30-day trial • No setup fees • Cancel anytime</p>
+            {isSignedIn ? (
+              <motion.button
+                whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleDashboardAccess}
+                className="px-12 py-4 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-xl font-bold text-xl transition-all duration-300 shadow-lg"
+              >
+                Go to Dashboard
+              </motion.button>
+            ) : (
+              <SignUpButton mode="modal">
+                <motion.button
+                  whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(59, 130, 246, 0.3)" }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-12 py-4 bg-gradient-to-r from-primary-500 to-secondary-500 hover:from-blue-600 hover:to-green-600 text-white rounded-xl font-bold text-xl transition-all duration-300 shadow-lg"
+                >
+                  Get Started Free
+                </motion.button>
+              </SignUpButton>
+            )}
+            <p className="text-gray-500 mt-4">© 2025 MediTrack • Smarter Healthcare, Closer to You</p>
           </motion.div>
         </div>
       </section>
@@ -657,7 +718,7 @@ const LandingPage = () => {
           {/* Bottom footer */}
           <div className="pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2025 MediTrack. All rights reserved. Built with React, Tailwind CSS, and ❤️
+          
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <button className="text-gray-400 hover:text-white transition-colors text-sm">Privacy Policy</button>
