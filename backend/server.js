@@ -3,10 +3,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const connectDB = require('./config/database');
+const { connectDB } = require('./config/database');
 require('dotenv').config();
 
-// Connect to MongoDB
+// Connect to Supabase
 connectDB();
 
 const authRoutes = require('./routes/auth');
@@ -39,6 +39,7 @@ app.use(cors({
 
 // Logging
 app.use(morgan('combined'));
+
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

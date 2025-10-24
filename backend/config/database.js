@@ -1,38 +1,41 @@
-const mongoose = require('mongoose');
+const { createClient } = require('@supabase/supabase-js');
+
+let supabase;
 
 const connectDB = async () => {
   try {
-    // Use your MongoDB Atlas connection string directly
-    const mongoURI = 'mongodb+srv://Saransh:Saransh123@cluster0.hzpgrzt.mongodb.net/meditrack?retryWrites=true&w=majority&appName=Cluster0';
+    // Initialize Supabase client
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
     
-    const conn = await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    console.log(`📊 MongoDB Atlas Connected: ${conn.connection.host}`);
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase configuration. Please check your environment variables.');
+    }
     
-    // Handle connection events
-    mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.log('MongoDB disconnected');
-    });
-
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-      await mongoose.connection.close();
-      console.log('MongoDB connection closed through app termination');
-      process.exit(0);
-    });
-
+    supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Test the connection by making a simple query
+    const { data, error } = await supabase.from('users').select('count').limit(1);
+    
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "relation does not exist" which is expected for new projects
+      throw error;
+    }
+    
+    console.log('📊 Supabase Connected Successfully');
+    
   } catch (error) {
-    console.warn('⚠️ MongoDB Atlas connection failed - Server will continue with sample data');
+    console.warn('⚠️ Supabase connection failed - Server will continue with sample data');
     console.warn('Error details:', error.message);
     // Don't exit the process, let the server continue running
   }
 };
 
-module.exports = connectDB;
+// Get Supabase client instance
+const getSupabaseClient = () => {
+  if (!supabase) {
+    throw new Error('Supabase client not initialized. Make sure to call connectDB() first.');
+  }
+  return supabase;
+};
+
+module.exports = { connectDB, getSupabaseClient };

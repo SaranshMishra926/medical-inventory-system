@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const { requireAuth, getUserFromClerk, requireActiveUser, requirePermission, logUserActivity } = require('../middleware/auth');
 const Supplier = require('../models/Supplier');
 const { body, validationResult } = require('express-validator');

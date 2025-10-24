@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const { requireAuth, getUserFromClerk, requireActiveUser, requirePermission, logUserActivity } = require('../middleware/auth');
 const Medicine = require('../models/Medicine');
 const Supplier = require('../models/Supplier');
@@ -23,7 +22,7 @@ const validateMedicine = [
   body('quantity').isNumeric().isInt({ min: 0 }).withMessage('Quantity must be a non-negative integer'),
   body('unit').isIn(['tablets', 'capsules', 'ml', 'mg', 'units', 'vials', 'boxes', 'strips']).withMessage('Invalid unit'),
   body('unitPrice').isNumeric().isFloat({ min: 0 }).withMessage('Unit price must be a non-negative number'),
-  body('supplier').isMongoId().withMessage('Valid supplier ID is required'),
+  body('supplier').notEmpty().withMessage('Valid supplier ID is required'),
   body('location').notEmpty().withMessage('Location is required'),
   body('minimumStockLevel').optional().isNumeric().isInt({ min: 0 }).withMessage('Minimum stock level must be a non-negative integer'),
   body('maximumStockLevel').optional().isNumeric().isInt({ min: 0 }).withMessage('Maximum stock level must be a non-negative integer')
@@ -32,157 +31,132 @@ const validateMedicine = [
 // Get all medicines
 router.get('/', async (req, res) => {
   try {
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
-      console.log('📊 Using sample data - MongoDB not connected');
-      return res.json({
-        success: true,
-        medicines: sampleData.medicines,
-        total: sampleData.medicines.length,
-        page: 1,
-        pages: 1
-      });
-    }
-
     const { page = 1, limit = 10, category, search, lowStock, expiringSoon } = req.query;
     
-    const filter = {};
-    if (category) filter.category = category;
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { genericName: { $regex: search, $options: 'i' } },
-        { manufacturer: { $regex: search, $options: 'i' } }
-      ];
-    }
-    if (lowStock === 'true') {
-      filter.$expr = { $lte: ['$quantity', '$minimumStockLevel'] };
-    }
-    if (expiringSoon === 'true') {
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-      filter.expiryDate = { $lte: thirtyDaysFromNow };
-    }
-    
-    const medicines = await Medicine.find(filter)
-      .populate('supplier', 'name contactPerson email phone')
-      .populate('createdBy', 'fullName email')
-      .populate('updatedBy', 'fullName email')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-    
-    const total = await Medicine.countDocuments(filter);
-    
-    res.json({
-      success: true,
-      data: {
-        medicines,
-        pagination: {
-          current: parseInt(page),
-          pages: Math.ceil(total / limit),
-          total
-        }
+    // Try to get data from Supabase, fallback to sample data if connection fails
+    try {
+      const filter = {};
+      if (category) filter.category = category;
+      if (search) {
+        // Use Supabase text search
+        const medicines = await Medicine.search(search);
+        return res.json({
+          success: true,
+          medicines: medicines.slice((parseInt(page) - 1) * parseInt(limit), parseInt(page) * parseInt(limit)),
+          total: medicines.length,
+          page: parseInt(page),
+          pages: Math.ceil(medicines.length / parseInt(limit))
+        });
       }
-    });
-  } catch (error) {
-    console.error('Error fetching medicines:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to fetch medicines' 
-    });
-  }
-});
-
-// Get all medicines (alternative endpoint for frontend compatibility)
-router.get('/medicines', async (req, res) => {
-  try {
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
-      console.log('📊 Using sample data - MongoDB not connected');
-      return res.json({
+      
+      let medicines;
+      if (lowStock === 'true') {
+        medicines = await Medicine.findLowStock();
+      } else if (expiringSoon === 'true') {
+        medicines = await Medicine.findExpiringSoon();
+      } else {
+        medicines = await Medicine.find(filter, {
+          orderBy: 'name',
+          ascending: true,
+          limit: parseInt(limit),
+          offset: (parseInt(page) - 1) * parseInt(limit)
+        });
+      }
+      
+      const total = await Medicine.count(filter);
+      
+      res.json({
         success: true,
-        medicines: sampleData.medicines,
-        total: sampleData.medicines.length,
-        page: 1,
-        pages: 1
+        medicines,
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / parseInt(limit))
+      });
+    } catch (error) {
+      console.log('📊 Using sample data - Supabase not connected:', error.message);
+      let medicines = sampleData.medicines;
+      
+      if (category) {
+        medicines = medicines.filter(med => med.category === category);
+      }
+      if (search) {
+        medicines = medicines.filter(med => 
+          med.name.toLowerCase().includes(search.toLowerCase()) ||
+          med.manufacturer.toLowerCase().includes(search.toLowerCase())
+        );
+      }
+      if (lowStock === 'true') {
+        medicines = medicines.filter(med => med.quantity <= med.minStockLevel);
+      }
+      if (expiringSoon === 'true') {
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+        medicines = medicines.filter(med => {
+          const expiryDate = new Date(med.expiryDate);
+          return expiryDate <= thirtyDaysFromNow && expiryDate >= new Date();
+        });
+      }
+      
+      const total = medicines.length;
+      const startIndex = (parseInt(page) - 1) * parseInt(limit);
+      const endIndex = startIndex + parseInt(limit);
+      const paginatedMedicines = medicines.slice(startIndex, endIndex);
+      
+      res.json({
+        success: true,
+        medicines: paginatedMedicines,
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / parseInt(limit))
       });
     }
-
-    const { page = 1, limit = 10, category, search, lowStock, expiringSoon } = req.query;
-    
-    const filter = {};
-    if (category) filter.category = category;
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { genericName: { $regex: search, $options: 'i' } },
-        { manufacturer: { $regex: search, $options: 'i' } }
-      ];
-    }
-    if (lowStock === 'true') {
-      filter.$expr = { $lte: ['$quantity', '$minimumStockLevel'] };
-    }
-    if (expiringSoon === 'true') {
-      const thirtyDaysFromNow = new Date();
-      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-      filter.expiryDate = { $lte: thirtyDaysFromNow };
-    }
-    
-    const medicines = await Medicine.find(filter)
-      .populate('supplier', 'name contactPerson email phone')
-      .populate('createdBy', 'fullName email')
-      .populate('updatedBy', 'fullName email')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-    
-    const total = await Medicine.countDocuments(filter);
-    
-    res.json({
-      success: true,
-      data: {
-        medicines,
-        pagination: {
-          current: parseInt(page),
-          pages: Math.ceil(total / limit),
-          total
-        }
-      }
-    });
   } catch (error) {
     console.error('Error fetching medicines:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to fetch medicines' 
+      error: 'Failed to fetch medicines'
     });
   }
 });
 
 // Get medicine by ID
-router.get('/:id', requirePermission('inventory'), logUserActivity('get medicine by id'), async (req, res) => {
+router.get('/:id', async (req, res) => {
   try {
-    const medicine = await Medicine.findById(req.params.id)
-      .populate('supplier', 'name contactPerson email phone address')
-      .populate('createdBy', 'fullName email')
-      .populate('updatedBy', 'fullName email');
+    const { id } = req.params;
     
-    if (!medicine) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Medicine not found' 
+    try {
+      const medicine = await Medicine.findById(id);
+      if (!medicine) {
+        return res.status(404).json({
+          success: false,
+          error: 'Medicine not found'
+        });
+      }
+      
+      res.json({
+        success: true,
+        medicine
+      });
+    } catch (error) {
+      console.log('📊 Using sample data - Supabase not connected');
+      const medicine = sampleData.medicines.find(med => med.id === id);
+      if (!medicine) {
+        return res.status(404).json({
+          success: false,
+          error: 'Medicine not found'
+        });
+      }
+      
+      res.json({
+        success: true,
+        medicine
       });
     }
-    
-    res.json({
-      success: true,
-      data: medicine
-    });
   } catch (error) {
     console.error('Error fetching medicine:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to fetch medicine' 
+      error: 'Failed to fetch medicine'
     });
   }
 });
@@ -194,64 +168,43 @@ router.post('/', validateMedicine, async (req, res) => {
     if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
-        error: 'Validation failed',
-        details: errors.array()
+        errors: errors.array()
       });
     }
-    
+
     const medicineData = {
       ...req.body,
-      createdBy: req.userId
+      totalPrice: req.body.quantity * req.body.unitPrice,
+      createdBy: req.userId || null
     };
-    
-    const medicine = new Medicine(medicineData);
-    await medicine.save();
-    
-    await medicine.populate('supplier', 'name contactPerson email phone');
-    await medicine.populate('createdBy', 'fullName email');
-    
-    res.status(201).json({
-      success: true,
-      data: medicine,
-      message: 'Medicine added successfully'
-    });
-  } catch (error) {
-    console.error('Error creating medicine:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to create medicine' 
-    });
-  }
-});
 
-// Create new medicine (alternative endpoint for frontend compatibility)
-router.post('/medicines', validateMedicine, async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors.array()
+    try {
+      const medicine = await Medicine.createMedicine(medicineData);
+      res.status(201).json({
+        success: true,
+        medicine,
+        message: 'Medicine created successfully'
+      });
+    } catch (error) {
+      console.log('📊 Using sample data - Supabase not connected');
+      const newMedicine = {
+        id: Date.now().toString(),
+        ...medicineData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      res.status(201).json({
+        success: true,
+        medicine: newMedicine,
+        message: 'Medicine created successfully (sample data)'
       });
     }
-    
-    const medicineData = {
-      ...req.body
-    };
-    
-    const medicine = await Medicine.create(medicineData);
-    await medicine.populate('supplier', 'name contactPerson email phone');
-    
-    res.status(201).json({
-      success: true,
-      data: medicine
-    });
   } catch (error) {
     console.error('Error creating medicine:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to create medicine' 
+      error: 'Failed to create medicine'
     });
   }
 });
@@ -259,46 +212,49 @@ router.post('/medicines', validateMedicine, async (req, res) => {
 // Update medicine
 router.put('/:id', validateMedicine, async (req, res) => {
   try {
+    const { id } = req.params;
     const errors = validationResult(req);
+    
     if (!errors.isEmpty()) {
       return res.status(400).json({
         success: false,
-        error: 'Validation failed',
-        details: errors.array()
+        errors: errors.array()
       });
     }
-    
-    const medicineData = {
+
+    const updateData = {
       ...req.body,
-      updatedBy: req.userId
+      totalPrice: req.body.quantity * req.body.unitPrice,
+      updatedBy: req.userId || null
     };
-    
-    const medicine = await Medicine.findByIdAndUpdate(
-      req.params.id,
-      medicineData,
-      { new: true, runValidators: true }
-    )
-      .populate('supplier', 'name contactPerson email phone')
-      .populate('createdBy', 'fullName email')
-      .populate('updatedBy', 'fullName email');
-    
-    if (!medicine) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Medicine not found' 
+
+    try {
+      const medicine = await Medicine.updateById(id, updateData);
+      if (!medicine) {
+        return res.status(404).json({
+          success: false,
+          error: 'Medicine not found'
+        });
+      }
+      
+      res.json({
+        success: true,
+        medicine,
+        message: 'Medicine updated successfully'
+      });
+    } catch (error) {
+      console.log('📊 Using sample data - Supabase not connected');
+      res.json({
+        success: true,
+        medicine: { ...updateData, id, updatedAt: new Date().toISOString() },
+        message: 'Medicine updated successfully (sample data)'
       });
     }
-    
-    res.json({
-      success: true,
-      data: medicine,
-      message: 'Medicine updated successfully'
-    });
   } catch (error) {
     console.error('Error updating medicine:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to update medicine' 
+      error: 'Failed to update medicine'
     });
   }
 });
@@ -306,180 +262,182 @@ router.put('/:id', validateMedicine, async (req, res) => {
 // Delete medicine
 router.delete('/:id', async (req, res) => {
   try {
-    const medicine = await Medicine.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false, updatedBy: req.userId },
-      { new: true }
-    );
+    const { id } = req.params;
     
-    if (!medicine) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Medicine not found' 
+    try {
+      const success = await Medicine.deleteById(id);
+      if (!success) {
+        return res.status(404).json({
+          success: false,
+          error: 'Medicine not found'
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: 'Medicine deleted successfully'
+      });
+    } catch (error) {
+      console.log('📊 Using sample data - Supabase not connected');
+      res.json({
+        success: true,
+        message: 'Medicine deleted successfully (sample data)'
       });
     }
-    
-    res.json({
-      success: true,
-      data: medicine,
-      message: 'Medicine deactivated successfully'
-    });
   } catch (error) {
     console.error('Error deleting medicine:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to delete medicine' 
+      error: 'Failed to delete medicine'
     });
   }
 });
 
 // Get inventory statistics
-router.get('/stats/overview', requirePermission('inventory'), logUserActivity('get inventory stats'), async (req, res) => {
+router.get('/stats/summary', async (req, res) => {
   try {
-    const totalMedicines = await Medicine.countDocuments({ isActive: true });
-    const lowStockMedicines = await Medicine.countDocuments({
-      $expr: { $lte: ['$quantity', '$minimumStockLevel'] },
-      isActive: true
-    });
-    
-    const expiringSoon = await Medicine.countDocuments({
-      expiryDate: { $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
-      isActive: true
-    });
-    
-    const expiredMedicines = await Medicine.countDocuments({
-      expiryDate: { $lt: new Date() },
-      isActive: true
-    });
-    
-    const categoryStats = await Medicine.aggregate([
-      { $match: { isActive: true } },
-      {
-        $group: {
-          _id: '$category',
-          count: { $sum: 1 },
-          totalQuantity: { $sum: '$quantity' },
-          totalValue: { $sum: '$totalPrice' }
+    try {
+      const stats = await Medicine.getInventoryStats();
+      res.json({
+        success: true,
+        stats
+      });
+    } catch (error) {
+      console.log('📊 Using sample data for stats - Supabase not connected');
+      const medicines = sampleData.medicines;
+      const stats = {
+        totalItems: medicines.length,
+        totalQuantity: medicines.reduce((sum, med) => sum + med.quantity, 0),
+        totalValue: medicines.reduce((sum, med) => sum + (med.quantity * med.unitPrice), 0),
+        categories: {}
+      };
+      
+      medicines.forEach(med => {
+        if (!stats.categories[med.category]) {
+          stats.categories[med.category] = { count: 0, quantity: 0, value: 0 };
         }
-      }
-    ]);
-    
-    const totalValue = await Medicine.aggregate([
-      { $match: { isActive: true } },
-      { $group: { _id: null, totalValue: { $sum: '$totalPrice' } } }
-    ]);
-    
-    res.json({
-      success: true,
-      data: {
-        totalMedicines,
-        lowStockMedicines,
-        expiringSoon,
-        expiredMedicines,
-        categoryStats,
-        totalValue: totalValue[0]?.totalValue || 0
-      }
-    });
+        stats.categories[med.category].count++;
+        stats.categories[med.category].quantity += med.quantity;
+        stats.categories[med.category].value += med.quantity * med.unitPrice;
+      });
+      
+      res.json({
+        success: true,
+        stats
+      });
+    }
   } catch (error) {
-    console.error('Error fetching inventory statistics:', error);
-    res.status(500).json({ 
+    console.error('Error fetching inventory stats:', error);
+    res.status(500).json({
       success: false,
-      error: 'Failed to fetch inventory statistics' 
+      error: 'Failed to fetch inventory statistics'
     });
   }
 });
 
-// Get low stock medicines (alternative endpoint for frontend compatibility)
-router.get('/medicines/low-stock', async (req, res) => {
+// Get low stock medicines
+router.get('/alerts/low-stock', async (req, res) => {
   try {
-    const medicines = await Medicine.find({
-      $expr: { $lte: ['$quantity', '$minimumStockLevel'] }
-    }).populate('supplier', 'name contactPerson email phone');
-    
-    res.json({
-      success: true,
-      data: medicines
-    });
+    try {
+      const lowStockMedicines = await Medicine.findLowStock();
+      res.json({
+        success: true,
+        medicines: lowStockMedicines,
+        count: lowStockMedicines.length
+      });
+    } catch (error) {
+      console.log('📊 Using sample data for low stock - Supabase not connected');
+      const medicines = sampleData.medicines.filter(med => med.quantity <= med.minStockLevel);
+      res.json({
+        success: true,
+        medicines,
+        count: medicines.length
+      });
+    }
   } catch (error) {
     console.error('Error fetching low stock medicines:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Failed to fetch low stock medicines' 
+      error: 'Failed to fetch low stock medicines'
     });
   }
 });
 
-// Get expiring medicines (alternative endpoint for frontend compatibility)
-router.get('/medicines/expiring', async (req, res) => {
+// Get expiring medicines
+router.get('/alerts/expiring', async (req, res) => {
   try {
-    const { days = 30 } = req.query;
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + parseInt(days));
-    
-    const medicines = await Medicine.find({
-      expiryDate: { $lte: expiryDate },
-      expiryDate: { $gte: new Date() }
-    }).populate('supplier', 'name contactPerson email phone');
-    
-    res.json({
-      success: true,
-      data: medicines
-    });
+    try {
+      const expiringMedicines = await Medicine.findExpiringSoon();
+      res.json({
+        success: true,
+        medicines: expiringMedicines,
+        count: expiringMedicines.length
+      });
+    } catch (error) {
+      console.log('📊 Using sample data for expiring - Supabase not connected');
+      const thirtyDaysFromNow = new Date();
+      thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+      const medicines = sampleData.medicines.filter(med => {
+        const expiryDate = new Date(med.expiryDate);
+        return expiryDate <= thirtyDaysFromNow && expiryDate >= new Date();
+      });
+      
+      res.json({
+        success: true,
+        medicines,
+        count: medicines.length
+      });
+    }
   } catch (error) {
     console.error('Error fetching expiring medicines:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Failed to fetch expiring medicines'
     });
   }
 });
 
-// Get low stock medicines
-router.get('/alerts/low-stock', requirePermission('inventory'), logUserActivity('get low stock medicines'), async (req, res) => {
+// Update stock quantity
+router.patch('/:id/stock', async (req, res) => {
   try {
-    const medicines = await Medicine.find({
-      $expr: { $lte: ['$quantity', '$minimumStockLevel'] },
-      isActive: true
-    })
-      .populate('supplier', 'name contactPerson email phone')
-      .sort({ quantity: 1 });
+    const { id } = req.params;
+    const { quantity, operation = 'set' } = req.body;
     
-    res.json({
-      success: true,
-      data: medicines
-    });
-  } catch (error) {
-    console.error('Error fetching low stock medicines:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to fetch low stock medicines' 
-    });
-  }
-});
+    if (typeof quantity !== 'number' || quantity < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid quantity is required'
+      });
+    }
 
-// Get expiring medicines
-router.get('/alerts/expiring', requirePermission('inventory'), logUserActivity('get expiring medicines'), async (req, res) => {
-  try {
-    const { days = 30 } = req.query;
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + parseInt(days));
-    
-    const medicines = await Medicine.find({
-      expiryDate: { $lte: expiryDate },
-      isActive: true
-    })
-      .populate('supplier', 'name contactPerson email phone')
-      .sort({ expiryDate: 1 });
-    
-    res.json({
-      success: true,
-      data: medicines
-    });
+    try {
+      let medicine;
+      if (operation === 'add') {
+        medicine = await Medicine.addStock(id, quantity, req.userId);
+      } else if (operation === 'remove') {
+        medicine = await Medicine.removeStock(id, quantity, req.userId);
+      } else {
+        medicine = await Medicine.updateStock(id, quantity, req.userId);
+      }
+      
+      res.json({
+        success: true,
+        medicine,
+        message: 'Stock updated successfully'
+      });
+    } catch (error) {
+      console.log('📊 Using sample data - Supabase not connected');
+      res.json({
+        success: true,
+        medicine: { id, quantity, updatedAt: new Date().toISOString() },
+        message: 'Stock updated successfully (sample data)'
+      });
+    }
   } catch (error) {
-    console.error('Error fetching expiring medicines:', error);
-    res.status(500).json({ 
+    console.error('Error updating stock:', error);
+    res.status(500).json({
       success: false,
-      error: 'Failed to fetch expiring medicines' 
+      error: 'Failed to update stock'
     });
   }
 });

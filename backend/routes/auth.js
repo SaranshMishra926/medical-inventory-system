@@ -14,7 +14,7 @@ router.get('/health', logUserActivity('auth health check'), (req, res) => {
     success: true,
     message: 'Authentication is working',
     user: {
-      id: req.user._id,
+      id: req.user.id,
       email: req.user.email,
       role: req.user.role
     },

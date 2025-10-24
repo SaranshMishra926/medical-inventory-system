@@ -48,43 +48,43 @@ api.interceptors.response.use(
 export const medicineAPI = {
   // Get all medicines
   getAll: async () => {
-    const response = await api.get('/inventory/medicines');
+    const response = await api.get('/inventory');
     return response.data;
   },
 
   // Get medicine by ID
   getById: async (id) => {
-    const response = await api.get(`/inventory/medicines/${id}`);
+    const response = await api.get(`/inventory/${id}`);
     return response.data;
   },
 
   // Create new medicine
   create: async (medicineData) => {
-    const response = await api.post('/inventory/medicines', medicineData);
+    const response = await api.post('/inventory', medicineData);
     return response.data;
   },
 
   // Update medicine
   update: async (id, medicineData) => {
-    const response = await api.put(`/inventory/medicines/${id}`, medicineData);
+    const response = await api.put(`/inventory/${id}`, medicineData);
     return response.data;
   },
 
   // Delete medicine
   delete: async (id) => {
-    const response = await api.delete(`/inventory/medicines/${id}`);
+    const response = await api.delete(`/inventory/${id}`);
     return response.data;
   },
 
   // Get low stock medicines
   getLowStock: async () => {
-    const response = await api.get('/inventory/medicines/low-stock');
+    const response = await api.get('/inventory/alerts/low-stock');
     return response.data;
   },
 
   // Get expiring medicines
   getExpiring: async (days = 30) => {
-    const response = await api.get(`/inventory/medicines/expiring?days=${days}`);
+    const response = await api.get(`/inventory/alerts/expiring?days=${days}`);
     return response.data;
   }
 };

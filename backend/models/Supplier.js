@@ -1,103 +1,148 @@
-const mongoose = require('mongoose');
+const BaseModel = require('./BaseModel');
 
-const supplierSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    trim: true,
-    unique: true
-  },
-  contactPerson: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true
-  },
-  phone: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  address: {
-    street: { type: String, required: true, trim: true },
-    city: { type: String, required: true, trim: true },
-    state: { type: String, required: true, trim: true },
-    zipCode: { type: String, required: true, trim: true },
-    country: { type: String, required: true, trim: true, default: 'India' }
-  },
-  website: {
-    type: String,
-    trim: true
-  },
-  licenseNumber: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true
-  },
-  gstNumber: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true
-  },
-  paymentTerms: {
-    type: String,
-    enum: ['Net 15', 'Net 30', 'Net 45', 'Net 60', 'Cash on Delivery', 'Advance Payment'],
-    default: 'Net 30'
-  },
-  rating: {
-    type: Number,
-    min: 1,
-    max: 5,
-    default: 3
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  notes: {
-    type: String,
-    trim: true
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: false
-  },
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+class Supplier extends BaseModel {
+  constructor() {
+    super('suppliers');
   }
-}, {
-  timestamps: true
-});
 
-// Update the updatedAt field before saving
-supplierSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
+  // Create a new supplier
+  async createSupplier(supplierData) {
+    const data = {
+      name: supplierData.name,
+      contact_person: supplierData.contactPerson,
+      email: supplierData.email,
+      phone: supplierData.phone,
+      address: supplierData.address,
+      website: supplierData.website,
+      license_number: supplierData.licenseNumber,
+      gst_number: supplierData.gstNumber,
+      payment_terms: supplierData.paymentTerms || 'Net 30',
+      rating: supplierData.rating || 3,
+      is_active: supplierData.isActive !== undefined ? supplierData.isActive : true,
+      notes: supplierData.notes,
+      created_by: supplierData.createdBy,
+      updated_by: supplierData.updatedBy,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
 
-// Index for efficient queries
-supplierSchema.index({ name: 1 });
-supplierSchema.index({ email: 1 });
-supplierSchema.index({ isActive: 1 });
+    return await this.create(data);
+  }
 
-const Supplier = mongoose.model('Supplier', supplierSchema);
+  // Find supplier by name
+  async findByName(name) {
+    return await this.findOne({ name });
+  }
 
-module.exports = Supplier;
+  // Find supplier by email
+  async findByEmail(email) {
+    return await this.findOne({ email: email.toLowerCase() });
+  }
+
+  // Find supplier by license number
+  async findByLicenseNumber(licenseNumber) {
+    return await this.findOne({ license_number: licenseNumber });
+  }
+
+  // Find supplier by GST number
+  async findByGstNumber(gstNumber) {
+    return await this.findOne({ gst_number: gstNumber });
+  }
+
+  // Get active suppliers
+  async getActiveSuppliers() {
+    return await this.find({ is_active: true });
+  }
+
+  // Search suppliers
+  async search(searchTerm) {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('*')
+      .or(`name.ilike.%${searchTerm}%,contact_person.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+      .eq('is_active', true);
+    
+    if (error) throw error;
+    return data;
+  }
+
+  // Get suppliers with medicine count
+  async getSuppliersWithMedicineCount() {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select(`
+        *,
+        medicines!supplier_id (
+          id,
+          name,
+          quantity
+        )
+      `)
+      .eq('is_active', true);
+    
+    if (error) throw error;
+    
+    // Process the data to add medicine count
+    return data.map(supplier => ({
+      ...supplier,
+      medicine_count: supplier.medicines ? supplier.medicines.length : 0,
+      total_medicine_quantity: supplier.medicines ? 
+        supplier.medicines.reduce((sum, med) => sum + (med.quantity || 0), 0) : 0
+    }));
+  }
+
+  // Update supplier rating
+  async updateRating(supplierId, newRating) {
+    if (newRating < 1 || newRating > 5) {
+      throw new Error('Rating must be between 1 and 5');
+    }
+    
+    return await this.updateById(supplierId, { 
+      rating: newRating,
+      updated_at: new Date().toISOString()
+    });
+  }
+
+  // Get suppliers by rating
+  async getSuppliersByRating(minRating = 1) {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('*')
+      .gte('rating', minRating)
+      .eq('is_active', true)
+      .order('rating', { ascending: false });
+    
+    if (error) throw error;
+    return data;
+  }
+
+  // Get supplier statistics
+  async getSupplierStats() {
+    const { data, error } = await this.supabase
+      .from(this.tableName)
+      .select('rating, payment_terms, is_active');
+    
+    if (error) throw error;
+    
+    const stats = {
+      totalSuppliers: data.length,
+      activeSuppliers: data.filter(s => s.is_active).length,
+      inactiveSuppliers: data.filter(s => !s.is_active).length,
+      averageRating: 0,
+      paymentTerms: {}
+    };
+    
+    if (data.length > 0) {
+      stats.averageRating = data.reduce((sum, s) => sum + (s.rating || 0), 0) / data.length;
+      
+      data.forEach(supplier => {
+        const term = supplier.payment_terms || 'Unknown';
+        stats.paymentTerms[term] = (stats.paymentTerms[term] || 0) + 1;
+      });
+    }
+    
+    return stats;
+  }
+}
+
+module.exports = new Supplier();

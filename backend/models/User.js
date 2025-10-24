@@ -1,141 +1,131 @@
-const mongoose = require('mongoose');
+const BaseModel = require('./BaseModel');
 
-const userSchema = new mongoose.Schema({
-  clerkId: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true,
-    trim: true
-  },
-  firstName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  lastName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  fullName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  profileImageUrl: {
-    type: String,
-    default: null
-  },
-  role: {
-    type: String,
-    enum: ['Administrator', 'Pharmacist', 'Inventory Manager', 'Staff', 'Viewer'],
-    default: 'Staff'
-  },
-  permissions: {
-    dashboard: { type: Boolean, default: true },
-    inventory: { type: Boolean, default: true },
-    orders: { type: Boolean, default: true },
-    suppliers: { type: Boolean, default: false },
-    reports: { type: Boolean, default: false },
-    settings: { type: Boolean, default: false }
-  },
-  notifications: {
-    orderUpdates: { type: Boolean, default: true },
-    lowStockAlerts: { type: Boolean, default: true },
-    expiryReminders: { type: Boolean, default: true },
-    supplierMessages: { type: Boolean, default: false },
-    systemUpdates: { type: Boolean, default: true }
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  lastLoginAt: {
-    type: Date,
-    default: Date.now
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+class User extends BaseModel {
+  constructor() {
+    super('users');
   }
-}, {
-  timestamps: true
-});
 
-// Update the updatedAt field before saving
-userSchema.pre('save', function(next) {
-  this.updatedAt = Date.now();
-  next();
-});
+  // Create a new user
+  async createUser(userData) {
+    const data = {
+      clerk_id: userData.clerkId,
+      email: userData.email,
+      first_name: userData.firstName,
+      last_name: userData.lastName,
+      full_name: userData.fullName,
+      profile_image_url: userData.profileImageUrl,
+      role: userData.role || 'Staff',
+      permissions: userData.permissions || this.getDefaultPermissions(userData.role || 'Staff'),
+      notifications: userData.notifications || this.getDefaultNotifications(),
+      is_active: userData.isActive !== undefined ? userData.isActive : true,
+      last_login_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
 
-// Static method to get role permissions
-userSchema.statics.getRolePermissions = function(role) {
-  const permissions = {
-    Administrator: {
-      dashboard: true,
-      inventory: true,
-      orders: true,
-      suppliers: true,
-      reports: true,
-      settings: true
-    },
-    Pharmacist: {
-      dashboard: true,
-      inventory: true,
-      orders: true,
-      suppliers: false,
-      reports: true,
-      settings: false
-    },
-    'Inventory Manager': {
-      dashboard: true,
-      inventory: true,
-      orders: false,
-      suppliers: true,
-      reports: true,
-      settings: false
-    },
-    Staff: {
-      dashboard: true,
-      inventory: true,
-      orders: true,
-      suppliers: false,
-      reports: false,
-      settings: false
-    },
-    Viewer: {
-      dashboard: true,
-      inventory: true,
-      orders: true,
-      suppliers: true,
-      reports: true,
-      settings: false
-    }
-  };
-  return permissions[role] || permissions.Viewer;
-};
+    return await this.create(data);
+  }
 
-// Instance method to check permissions
-userSchema.methods.hasPermission = function(page) {
-  return this.permissions[page] || false;
-};
+  // Find user by Clerk ID
+  async findByClerkId(clerkId) {
+    return await this.findOne({ clerk_id: clerkId });
+  }
 
-// Instance method to update permissions based on role
-userSchema.methods.updatePermissionsByRole = function() {
-  this.permissions = User.getRolePermissions(this.role);
-};
+  // Find user by email
+  async findByEmail(email) {
+    return await this.findOne({ email: email.toLowerCase() });
+  }
 
-const User = mongoose.model('User', userSchema);
+  // Update user permissions based on role
+  async updatePermissionsByRole(userId, role) {
+    const permissions = this.getRolePermissions(role);
+    return await this.updateById(userId, { permissions });
+  }
 
-module.exports = User;
+  // Update last login time
+  async updateLastLogin(userId) {
+    return await this.updateById(userId, { 
+      last_login_at: new Date().toISOString() 
+    });
+  }
+
+  // Get role permissions
+  getRolePermissions(role) {
+    const permissions = {
+      Administrator: {
+        dashboard: true,
+        inventory: true,
+        orders: true,
+        suppliers: true,
+        reports: true,
+        settings: true
+      },
+      Pharmacist: {
+        dashboard: true,
+        inventory: true,
+        orders: true,
+        suppliers: false,
+        reports: true,
+        settings: false
+      },
+      'Inventory Manager': {
+        dashboard: true,
+        inventory: true,
+        orders: false,
+        suppliers: true,
+        reports: true,
+        settings: false
+      },
+      Staff: {
+        dashboard: true,
+        inventory: true,
+        orders: true,
+        suppliers: false,
+        reports: false,
+        settings: false
+      },
+      Viewer: {
+        dashboard: true,
+        inventory: true,
+        orders: true,
+        suppliers: true,
+        reports: true,
+        settings: false
+      }
+    };
+    return permissions[role] || permissions.Viewer;
+  }
+
+  // Get default permissions for a role
+  getDefaultPermissions(role) {
+    return this.getRolePermissions(role);
+  }
+
+  // Get default notifications
+  getDefaultNotifications() {
+    return {
+      order_updates: true,
+      low_stock_alerts: true,
+      expiry_reminders: true,
+      supplier_messages: false,
+      system_updates: true
+    };
+  }
+
+  // Check if user has permission for a specific page
+  hasPermission(user, page) {
+    return user.permissions && user.permissions[page] === true;
+  }
+
+  // Get all active users
+  async getActiveUsers() {
+    return await this.find({ is_active: true });
+  }
+
+  // Get users by role
+  async getUsersByRole(role) {
+    return await this.find({ role });
+  }
+}
+
+module.exports = new User();

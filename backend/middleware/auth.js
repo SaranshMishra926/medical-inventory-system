@@ -13,14 +13,14 @@ const getUserFromClerk = async (req, res, next) => {
     if (req.auth && req.auth.userId) {
       // Get user from database using Clerk ID
       const User = require('../models/User');
-      const user = await User.findOne({ clerkId: req.auth.userId });
+      const user = await User.findByClerkId(req.auth.userId);
       
       if (user) {
         req.user = user;
-        req.userId = user._id;
+        req.userId = user.id;
       } else {
         // Create user if doesn't exist
-        const newUser = new User({
+        const userData = {
           clerkId: req.auth.userId,
           email: req.auth.sessionClaims?.email,
           firstName: req.auth.sessionClaims?.firstName,
@@ -28,14 +28,11 @@ const getUserFromClerk = async (req, res, next) => {
           fullName: `${req.auth.sessionClaims?.firstName} ${req.auth.sessionClaims?.lastName}`,
           profileImageUrl: req.auth.sessionClaims?.imageUrl,
           role: req.auth.sessionClaims?.publicMetadata?.role || 'Staff'
-        });
+        };
         
-        // Set permissions based on role
-        newUser.permissions = User.getRolePermissions(newUser.role);
-        
-        await newUser.save();
+        const newUser = await User.createUser(userData);
         req.user = newUser;
-        req.userId = newUser._id;
+        req.userId = newUser.id;
       }
     }
     next();
@@ -52,7 +49,7 @@ const requirePermission = (permission) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
     
-    if (!req.user.hasPermission(permission)) {
+    if (!User.hasPermission(req.user, permission)) {
       return res.status(403).json({ 
         error: 'Insufficient permissions',
         message: `You don't have permission to access ${permission}`
@@ -69,7 +66,7 @@ const requireActiveUser = (req, res, next) => {
     return res.status(401).json({ error: 'Authentication required' });
   }
   
-  if (!req.user.isActive) {
+  if (!req.user.is_active) {
     return res.status(403).json({ 
       error: 'Account deactivated',
       message: 'Your account has been deactivated. Please contact administrator.'
